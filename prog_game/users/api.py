@@ -1,6 +1,4 @@
 from django.contrib.auth.models import User
-from django.db import transaction
-
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -62,7 +60,7 @@ class Login(APIView):
         
         user = serializer.validated_data['user']
         token = generate_token(user.id)
-        return Response({'token': token, 'user': LoginSerializer(user).data})
+        return Response({'token': token, 'user': UserSerializer(user).data})
 
 
 class CheckToken(APIView):
@@ -72,18 +70,16 @@ class CheckToken(APIView):
     def get(self, request):
         if not request.user or not request.user.is_active:
             return Response({'id': -1}, status=status.HTTP_401_UNAUTHORIZED)
-        return Response(self.serializer_class(request.user).data)
+        return Response(UserSerializer(request.user).data)
 
 
 class UserUpdate(APIView):
     @with_authorization
     def put(self, request, user_id: int):
-        # Проверяем, что обновляем свой профиль
         if request.user.id != user_id:
             return Response({'error': 'You can only update your own profile'}, 
                           status=status.HTTP_403_FORBIDDEN)
         
-        # Используем request.user вместо отдельного запроса
         serializer = UserUpdateSerializer(request.user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -91,11 +87,6 @@ class UserUpdate(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-"""
-@api {POST} /api/user/deactivate/ UserDeactivate
-@apiGroup User
-@apiDescription Деактивация пользователя (мягкое удаление)
-"""
 class UserDeactivate(APIView):
     @with_authorization
     def post(self, request):
@@ -169,16 +160,13 @@ class UserParent(APIView):
 class UserParentDetail(APIView):
     @with_authorization
     def get(self, request, user_id: int):
-        # Если запрашиваем свои данные - используем request.user
         if request.user.id == user_id:
             profile = request.user.profile
         else:
-            # Проверяем права админа
             if not request.user.is_staff:
                 return Response({'error': 'Permission denied'}, 
                               status=status.HTTP_403_FORBIDDEN)
             
-            # Получаем пользователя с профилем одним запросом
             try:
                 user = User.objects.select_related('profile').get(id=user_id)
                 profile = user.profile
@@ -207,9 +195,7 @@ class AddChild(APIView):
             child_user = User.objects.create_user(
                 username=serializer.validated_data['username'],
                 email=serializer.validated_data['email'],
-                password=serializer.validated_data['password'],
-                first_name=serializer.validated_data.get('first_name', ''),
-                last_name=serializer.validated_data.get('last_name', '')
+                password=serializer.validated_data['password']
             )
             
             child_user.profile.parent = profile
