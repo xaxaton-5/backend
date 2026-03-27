@@ -24,6 +24,7 @@ services:
       dockerfile: Dockerfile
     command: python run.py
     environment:
+      CORE_URL: http://web:8000
       MESSAGING_HOST: 0.0.0.0
       MESSAGING_PORT: "5001"
       MESSAGING_DEBUG: "true"
