@@ -4,7 +4,6 @@ from django.db import transaction
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
 
 from users.decorators import with_authorization
 from users.serializers import (
@@ -18,66 +17,20 @@ from users.utils import generate_token
 from users.models import Profile
 
 
-"""
-@api {GET} /api/users/list/ UserList
-@apiName SecretsAPI
-@apiGroup User
-@apiSuccess (Ответ) {Object[]} users Список активных пользователей.
-@apiSuccess (Ответ) {Number} users.id Идентификатор пользователя (-1 если не найден).
-@apiSuccess (Ответ) {String} users.email Электронная почта пользователя.
-@apiSuccess (Ответ) {Date} users.date_joined Дата регистрации аккаунта.
-@apiSuccess (Ответ) {Boolean} users.is_superuser Статус администратора.
-
-@apiSuccessExample Список пользователей (может быть пуст):
-    HTTP/1.1 200 OK
-    [
-        {
-            "id": 1,
-            "email": "red_hot_osu_pepper@mail.ru",
-            "date_joined": "2025-02-15T12:35:39.850569Z",
-            "is_superuser": true
-        }
-    ]
-"""
 class UserList(APIView):
     def get(self, request):
-        users = [
-            UserSerializer(user).data
-            for user in User.objects.filter(is_active=True)
-        ]
-        return Response(users)
+        users = User.objects.filter(is_active=True)
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data)
 
 
-"""
-@api {GET} /api/users/detail/:id/ UserDetail
-@apiGroup User
-
-@apiParam {Number} id Идентификатор пользователя.
-
-@apiSuccess (Ответ) {Number} id Идентификатор пользователя.
-@apiSuccess (Ответ) {String} email Электронная почта пользователя.
-@apiSuccess (Ответ) {Date} date_joined Дата регистрации аккаунта.
-@apiSuccess (Ответ) {Boolean} is_superuser Статус администратора.
-@apiSuccess (Ответ) {Boolean} is_active Статус активности.
-
-@apiSuccessExample Пользователь существует:
-    HTTP/1.1 200 OK
-    {
-        "id": 1,
-        "email": "red_hot_osu_pepper@mail.ru",
-        "date_joined": "2025-02-15T12:35:39.850569Z",
-        "is_superuser": true,
-        "is_active": true
-    }
-
-@apiErrorExample {json} Пользователя с указанным ид не существует:
-    HTTP/1.1 404 Not Found
-    {
-        "id": -1
-    }
-"""
 class UserDetail(APIView):
     def get(self, request, user_id: int):
+        # Если запрашиваем свой профиль - используем request.user
+        if request.user.is_authenticated and request.user.id == user_id:
+            return Response(UserDetailSerializer(request.user).data)
+        
+        # Иначе ищем в БД
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
@@ -85,127 +38,33 @@ class UserDetail(APIView):
         return Response(UserDetailSerializer(user).data)
 
 
-"""
-@api {POST} /api/register/ Registration
-@apiGroup User
-@apiDescription Регистрация нового пользователя
-@apiBody {String} login Логин пользователя
-@apiBody {String} password Пароль
-@apiBody {String} password_confirm Подтверждение пароля
-@apiBody {String} email Электронная почта
-@apiBody {String} [first_name] Имя
-@apiBody {String} [last_name] Фамилия
-@apiBody {Boolean} [is_parent] Является ли родителем (по умолчанию false)
-@apiBody {Number} [parent_id] ID родителя (если регистрируется ребенок)
-
-@apiSuccessExample Успешная регистрация:
-    HTTP/1.1 201 Created
-    {
-        "id": 5,
-        "username": "newuser",
-        "email": "newuser@example.com",
-        "profile": {
-            "exp": 0,
-            "is_parent": false,
-            "parent": null,
-            "children": []
-        }
-    }
-"""
 class Registration(APIView):
     serializer_class = RegistrationSerializer
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        with transaction.atomic():
-            user = serializer.save()
-            token = generate_token(user.id)
-            return Response({
-                'token': token,
-                'user': UserSerializer(user).data,
-                'profile': ProfileSerializer(user.profile).data
-            }, status=status.HTTP_201_CREATED)
+        user = serializer.save()
+        token = generate_token(user.id)
+        return Response({
+            'token': token,
+            'user': UserSerializer(user).data,
+            'profile': ProfileSerializer(user.profile).data
+        }, status=status.HTTP_201_CREATED)
 
 
-"""
-@api {POST} /api/login/ Login
-@apiGroup User
-@apiBody {String} email Электронная почта пользователя.
-@apiBody {String} password Пароль.
-
-@apiSuccess (Ответ) {String} token Bearer-токен для headers.
-@apiSuccess (Ответ) {Object} user Объект пользователя.
-@apiSuccess (Ответ) {Number} user.id Идентификатор пользователя.
-@apiSuccess (Ответ) {String} user.email Электронная почта пользователя.
-@apiSuccess (Ответ) {Boolean} user.is_superuser Статус администратора.
-
-@apiSuccessExample Успешный вход в аккаунт:
-    HTTP/1.1 200 OK
-    {
-        "token": "eyJhbGciOiJIUzI1NisIInr5cCI6IkpXVCJ9.eYjcSZCI6Nn0.uCO9ujoT4xLkeE9S3yG_b-k0lSNERADmGqh8YRozqYE",
-        "user": {
-            "id": 1,
-            "email": "red_hot_osu_pepper@mail.ru",
-            "is_superuser": true
-        }
-    }
-
-@apiErrorExample {json} Пропущено поле:
-    HTTP/1.1 404 Not Found
-    {
-        "password": [
-            "Обязательное поле."
-        ]
-    }
-
-@apiErrorExample {json} Некорректно указана почта:
-    HTTP/1.1 404 Not Found
-    {
-        "email": [
-            "Введите правильный адрес электронной почты."
-        ]
-    }
-"""
 class Login(APIView):
     serializer_class = LoginSerializer
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        try:
-            user = User.objects.get(email=serializer.initial_data.get('email'), is_active=True)
-            if not user.check_password(serializer.initial_data.get('password')):
-                raise User.DoesNotExist
-        except User.DoesNotExist:
-            return Response({'user': -1}, status=status.HTTP_404_NOT_FOUND)
+        
+        user = serializer.validated_data['user']
         token = generate_token(user.id)
         return Response({'token': token, 'user': LoginSerializer(user).data})
 
 
-"""
-@api {GET} /api/auth/ CheckToken
-@apiGroup User
-@apiDescription Токен берется из headers по ключу Authorized. Формат: Bearer TokenHere
-
-@apiSuccess (Ответ) {Number} id Идентификатор пользователя (-1 при некорректном токене).
-@apiSuccess (Ответ) {String} email Электронная почта пользователя.
-@apiSuccess (Ответ) {Boolean} is_superuser Статус администратора.
-
-@apiSuccessExample Аккаунт успешно зарегистрирован:
-    HTTP/1.1 200 OK
-    {
-        "id": 1,
-        "email": "red_hot_osu_pepper@mail.ru",
-        "is_superuser": false
-    }
-
-@apiErrorExample {json} Токен не передан либо не соответствует активному пользователю:
-    HTTP/1.1 401 Unauthorized
-    {
-        "id": -1
-    }
-"""
 class CheckToken(APIView):
     serializer_class = LoginSerializer
 
@@ -216,89 +75,45 @@ class CheckToken(APIView):
         return Response(self.serializer_class(request.user).data)
 
 
-"""
-@api {PUT} /api/user/update/:id/ UserUpdate
-@apiGroup User
-@apiDescription Обновление профиля пользователя (только свои данные)
-@apiParam {Number} id Идентификатор пользователя
-@apiBody {String} [email] Электронная почта
-@apiBody {String} [first_name] Имя
-@apiBody {String} [last_name] Фамилия
-
-@apiSuccessExample Успешное обновление:
-    HTTP/1.1 200 OK
-    {
-        "id": 1,
-        "email": "newemail@example.com",
-        "first_name": "New",
-        "last_name": "Name"
-    }
-"""
 class UserUpdate(APIView):
     @with_authorization
     def put(self, request, user_id: int):
+        # Проверяем, что обновляем свой профиль
         if request.user.id != user_id:
             return Response({'error': 'You can only update your own profile'}, 
                           status=status.HTTP_403_FORBIDDEN)
         
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response({'id': -1}, status=status.HTTP_404_NOT_FOUND)
-        
-        serializer = UserUpdateSerializer(user, data=request.data, partial=True)
+        # Используем request.user вместо отдельного запроса
+        serializer = UserUpdateSerializer(request.user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(UserDetailSerializer(user).data)
+            return Response(UserDetailSerializer(request.user).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 """
-@api {DELETE} /api/user/delete/:id/ UserDelete
+@api {POST} /api/user/deactivate/ UserDeactivate
 @apiGroup User
-@apiDescription Удаление пользователя (только свои данные или администратор)
-@apiParam {Number} id Идентификатор пользователя
-
-@apiSuccessExample Успешное удаление:
-    HTTP/1.1 200 OK
-    {
-        "message": "User deleted successfully"
-    }
+@apiDescription Деактивация пользователя (мягкое удаление)
 """
-class UserDelete(APIView):
+class UserDeactivate(APIView):
     @with_authorization
-    def delete(self, request, user_id: int):
-        if request.user.id != user_id and not request.user.is_staff:
-            return Response({'error': 'Permission denied'}, 
+    def post(self, request):
+        user = request.user
+        
+        if user.is_superuser or user.is_staff:
+            return Response({'error': 'Cannot deactivate admin users via API'}, 
                           status=status.HTTP_403_FORBIDDEN)
         
-        try:
-            user = User.objects.get(id=user_id)
-            user.delete()
-            return Response({'message': 'User deleted successfully'}, 
-                          status=status.HTTP_200_OK)
-        except User.DoesNotExist:
-            return Response({'id': -1}, status=status.HTTP_404_NOT_FOUND)
+        user.is_active = False
+        user.save()
+        
+        return Response({
+            'message': 'User deactivated successfully',
+            'user_id': user.id
+        }, status=status.HTTP_200_OK)
 
 
-"""
-@api {GET} /api/user/children/ ChildrenList
-@apiGroup User
-@apiDescription Получить список детей текущего пользователя
-@apiHeader {String} Authorization Bearer токен
-
-@apiSuccessExample Список детей:
-    HTTP/1.1 200 OK
-    [
-        {
-            "user_id": 3,
-            "username": "child1",
-            "email": "child1@example.com",
-            "exp": 150,
-            "created_at": "2024-01-15T10:30:00Z"
-        }
-    ]
-"""
 class ChildrenList(APIView):
     @with_authorization
     def get(self, request):
@@ -313,64 +128,31 @@ class ChildrenList(APIView):
         return Response(serializer.data)
 
 
-"""
-@api {GET} /api/user/children/:user_id/ UserChildrenList
-@apiGroup User
-@apiDescription Получить список детей конкретного пользователя
-@apiParam {Number} user_id ID пользователя
-@apiHeader {String} Authorization Bearer токен
-
-@apiSuccessExample Список детей:
-    HTTP/1.1 200 OK
-    [
-        {
-            "user_id": 3,
-            "username": "child1",
-            "email": "child1@example.com",
-            "exp": 150,
-            "created_at": "2024-01-15T10:30:00Z"
-        }
-    ]
-"""
 class UserChildrenList(APIView):
     @with_authorization
     def get(self, request, user_id: int):
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response({'id': -1}, status=status.HTTP_404_NOT_FOUND)
+        if request.user.id == user_id:
+            profile = request.user.profile
+        else:
+            if not request.user.is_staff:
+                return Response({'error': 'Permission denied'}, 
+                              status=status.HTTP_403_FORBIDDEN)
+            
+            try:
+                user = User.objects.select_related('profile').get(id=user_id)
+                profile = user.profile
+            except User.DoesNotExist:
+                return Response({'id': -1}, status=status.HTTP_404_NOT_FOUND)
         
-        if request.user.id != user_id and not request.user.is_staff:
-            return Response({'error': 'Permission denied'}, 
-                          status=status.HTTP_403_FORBIDDEN)
-        
-        if not user.profile.is_parent:
+        if not profile.is_parent:
             return Response({'error': 'User is not a parent'}, 
                           status=status.HTTP_403_FORBIDDEN)
         
-        children = user.profile.children.all()
+        children = profile.children.all()
         serializer = ChildProfileSerializer(children, many=True)
         return Response(serializer.data)
 
 
-"""
-@api {GET} /api/user/parent/ UserParent
-@apiGroup User
-@apiDescription Получить родителя текущего пользователя
-@apiHeader {String} Authorization Bearer токен
-
-@apiSuccessExample Информация о родителе:
-    HTTP/1.1 200 OK
-    {
-        "id": 2,
-        "username": "parent_user",
-        "email": "parent@example.com",
-        "exp": 500,
-        "is_parent": true,
-        "parent": null,
-        "children": [...]
-    }
-"""
 class UserParent(APIView):
     @with_authorization
     def get(self, request):
@@ -384,70 +166,33 @@ class UserParent(APIView):
         return Response(serializer.data)
 
 
-"""
-@api {GET} /api/user/parent/:user_id/ UserParentDetail
-@apiGroup User
-@apiDescription Получить родителя конкретного пользователя
-@apiParam {Number} user_id ID пользователя
-@apiHeader {String} Authorization Bearer токен
-
-@apiSuccessExample Информация о родителе:
-    HTTP/1.1 200 OK
-    {
-        "id": 2,
-        "username": "parent_user",
-        "email": "parent@example.com",
-        "exp": 500,
-        "is_parent": true,
-        "parent": null,
-        "children": [...]
-    }
-"""
 class UserParentDetail(APIView):
     @with_authorization
     def get(self, request, user_id: int):
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response({'id': -1}, status=status.HTTP_404_NOT_FOUND)
+        # Если запрашиваем свои данные - используем request.user
+        if request.user.id == user_id:
+            profile = request.user.profile
+        else:
+            # Проверяем права админа
+            if not request.user.is_staff:
+                return Response({'error': 'Permission denied'}, 
+                              status=status.HTTP_403_FORBIDDEN)
+            
+            # Получаем пользователя с профилем одним запросом
+            try:
+                user = User.objects.select_related('profile').get(id=user_id)
+                profile = user.profile
+            except User.DoesNotExist:
+                return Response({'id': -1}, status=status.HTTP_404_NOT_FOUND)
         
-        if request.user.id != user_id and not request.user.is_staff:
-            return Response({'error': 'Permission denied'}, 
-                          status=status.HTTP_403_FORBIDDEN)
-        
-        if not user.profile.parent:
+        if not profile.parent:
             return Response({'error': 'User has no parent'}, 
                           status=status.HTTP_404_NOT_FOUND)
         
-        serializer = ProfileSerializer(user.profile.parent)
+        serializer = ProfileSerializer(profile.parent)
         return Response(serializer.data)
 
 
-"""
-@api {POST} /api/user/add-child/ AddChild
-@apiGroup User
-@apiDescription Создать нового ребенка и привязать к текущему пользователю
-@apiHeader {String} Authorization Bearer токен
-@apiBody {String} username Логин ребенка
-@apiBody {String} email Электронная почта
-@apiBody {String} password Пароль
-@apiBody {String} password_confirm Подтверждение пароля
-@apiBody {String} [first_name] Имя
-@apiBody {String} [last_name] Фамилия
-
-@apiSuccessExample Ребенок создан:
-    HTTP/1.1 201 Created
-    {
-        "child": {
-            "user_id": 3,
-            "username": "newchild",
-            "email": "newchild@example.com",
-            "exp": 0,
-            "created_at": "2024-01-15T10:30:00Z"
-        },
-        "message": "Child created and linked successfully"
-    }
-"""
 class AddChild(APIView):
     @with_authorization
     def post(self, request):
@@ -459,48 +204,27 @@ class AddChild(APIView):
         
         serializer = AddChildSerializer(data=request.data)
         if serializer.is_valid():
-            with transaction.atomic():
-                child_user = User.objects.create_user(
-                    username=serializer.validated_data['username'],
-                    email=serializer.validated_data['email'],
-                    password=serializer.validated_data['password'],
-                    first_name=serializer.validated_data.get('first_name', ''),
-                    last_name=serializer.validated_data.get('last_name', '')
-                )
-                
-                child_user.profile.parent = profile
-                child_user.profile.is_parent = False
-                child_user.profile.save()
-                
-                response_data = {
-                    'child': ChildProfileSerializer(child_user.profile).data,
-                    'message': 'Child created and linked successfully'
-                }
-                return Response(response_data, status=status.HTTP_201_CREATED)
+            child_user = User.objects.create_user(
+                username=serializer.validated_data['username'],
+                email=serializer.validated_data['email'],
+                password=serializer.validated_data['password'],
+                first_name=serializer.validated_data.get('first_name', ''),
+                last_name=serializer.validated_data.get('last_name', '')
+            )
+            
+            child_user.profile.parent = profile
+            child_user.profile.is_parent = False
+            child_user.profile.save()
+            
+            response_data = {
+                'child': ChildProfileSerializer(child_user.profile).data,
+                'message': 'Child created and linked successfully'
+            }
+            return Response(response_data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-"""
-@api {POST} /api/user/link-child/ LinkChild
-@apiGroup User
-@apiDescription Привязать существующего ребенка к текущему пользователю
-@apiHeader {String} Authorization Bearer токен
-@apiBody {Number} child_id ID ребенка для привязки
-
-@apiSuccessExample Ребенок привязан:
-    HTTP/1.1 200 OK
-    {
-        "child": {
-            "user_id": 3,
-            "username": "child1",
-            "email": "child1@example.com",
-            "exp": 150,
-            "created_at": "2024-01-15T10:30:00Z"
-        },
-        "message": "Child linked successfully"
-    }
-"""
 class LinkChild(APIView):
     @with_authorization
     def post(self, request):
@@ -513,7 +237,12 @@ class LinkChild(APIView):
         serializer = LinkChildSerializer(data=request.data)
         if serializer.is_valid():
             child_id = serializer.validated_data['child_id']
-            child_profile = Profile.objects.get(user__id=child_id)
+            
+            try:
+                child_profile = Profile.objects.select_related('user').get(user__id=child_id)
+            except Profile.DoesNotExist:
+                return Response({'error': 'Child profile not found'}, 
+                              status=status.HTTP_404_NOT_FOUND)
             
             if child_profile.parent:
                 return Response({'error': 'Child already has a parent'}, 
@@ -530,20 +259,6 @@ class LinkChild(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-"""
-@api {DELETE} /api/user/remove-child/:child_id/ RemoveChild
-@apiGroup User
-@apiDescription Отвязать ребенка от текущего пользователя
-@apiParam {Number} child_id ID ребенка
-@apiHeader {String} Authorization Bearer токен
-
-@apiSuccessExample Ребенок отвязан:
-    HTTP/1.1 200 OK
-    {
-        "message": "Child unlinked successfully",
-        "child_id": 3
-    }
-"""
 class RemoveChild(APIView):
     @with_authorization
     def delete(self, request, child_id: int):
@@ -567,28 +282,6 @@ class RemoveChild(APIView):
                           status=status.HTTP_404_NOT_FOUND)
 
 
-"""
-@api {POST} /api/admin/users/create/ UserCreate
-@apiGroup Admin
-@apiDescription Создание пользователя (административный)
-@apiHeader {String} Authorization Bearer токен (требуются права администратора)
-@apiBody {String} username Логин
-@apiBody {String} password Пароль
-@apiBody {String} email Электронная почта
-@apiBody {String} [first_name] Имя
-@apiBody {String} [last_name] Фамилия
-@apiBody {Number} [exp] Опыт (по умолчанию 0)
-@apiBody {Boolean} [is_parent] Является родителем
-@apiBody {Number} [parent_id] ID родителя
-
-@apiSuccessExample Пользователь создан:
-    HTTP/1.1 201 Created
-    {
-        "id": 5,
-        "username": "newuser",
-        "email": "newuser@example.com"
-    }
-"""
 class UserCreate(APIView):
     @with_authorization
     def post(self, request):
@@ -603,27 +296,6 @@ class UserCreate(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-"""
-@api {PUT} /api/admin/users/update/:user_id/ UserAdminUpdate
-@apiGroup Admin
-@apiDescription Обновление пользователя (административный)
-@apiParam {Number} user_id ID пользователя
-@apiHeader {String} Authorization Bearer токен (требуются права администратора)
-@apiBody {String} [email] Электронная почта
-@apiBody {String} [first_name] Имя
-@apiBody {String} [last_name] Фамилия
-@apiBody {Number} [exp] Опыт
-@apiBody {Boolean} [is_parent] Является родителем
-@apiBody {Number} [parent_id] ID родителя
-
-@apiSuccessExample Пользователь обновлен:
-    HTTP/1.1 200 OK
-    {
-        "id": 5,
-        "username": "updateduser",
-        "email": "updated@example.com"
-    }
-"""
 class UserAdminUpdate(APIView):
     @with_authorization
     def put(self, request, user_id: int):
