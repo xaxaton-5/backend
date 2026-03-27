@@ -9,7 +9,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'no-so-secret')
 DEBUG = os.environ.get('DEBUG', 'false').lower() in {'true', '1', 'y'}
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
-MESSAGING_SERVICE_URL = os.environ.get('MESSAGING_SERVICE_URL', 'http://messaging:5001/').rstrip('/')
+MESSAGING_SERVICE_URL = os.environ.get('MESSAGING_SERVICE_URL', 'http://localhost:5001/').rstrip('/')
 
 INSTALLED_APPS = [
     'corsheaders',
@@ -20,7 +20,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'users.apps.UsersConfig',
-    'achievements.apps.AchievementsConfig'
+    'achievements.apps.AchievementsConfig',
+    'messaging.apps.MessagingConfig',
 ]
 
 MIDDLEWARE = [

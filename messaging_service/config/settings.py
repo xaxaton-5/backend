@@ -12,6 +12,7 @@ PORT = int(os.environ.get('MESSAGING_PORT', 5001))
 UVICORN_WORKERS = int(os.environ.get('MESSAGING_UVICORN_WORKERS', 2))
 DEBUG = load_bool('MESSAGING_DEBUG')
 
+CORE_URL = os.environ.get('CORE_URL', 'http://localhost:8000').rstrip('/')
 
 log_level = os.environ.get('LOG_LEVEL', 'INFO')
 if log_level == 'INFO':
