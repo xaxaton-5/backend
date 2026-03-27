@@ -16,6 +16,7 @@ def seed_initial_data(apps, schema_editor):
             'last_name': 'Parent',
             'password': 'demo12345',
             'is_parent': True,
+            'exp': 5000,
             'parent_username': None,
         },
         {
@@ -25,6 +26,7 @@ def seed_initial_data(apps, schema_editor):
             'last_name': 'Child',
             'password': 'demo12345',
             'is_parent': False,
+            'exp': 10000,
             'parent_username': 'parent_demo',
         },
         {
@@ -34,6 +36,7 @@ def seed_initial_data(apps, schema_editor):
             'last_name': 'Mentor',
             'password': 'demo12345',
             'is_parent': True,
+            'exp': 0,
             'parent_username': None,
         },
     ]
@@ -57,7 +60,7 @@ def seed_initial_data(apps, schema_editor):
             user=user,
             defaults={
                 'is_parent': user_data['is_parent'],
-                'exp': 0,
+                'exp': user_data['exp'],
             },
         )
 
@@ -65,30 +68,73 @@ def seed_initial_data(apps, schema_editor):
         user = created_users[user_data['username']]
         profile = Profile.objects.get(user=user)
         profile.is_parent = user_data['is_parent']
+        profile.exp = user_data['exp']
         parent_username = user_data['parent_username']
         profile.parent = None
         if parent_username:
             profile.parent = Profile.objects.get(user=created_users[parent_username])
-        profile.save(update_fields=['is_parent', 'parent'])
+        profile.save(update_fields=['is_parent', 'exp', 'parent'])
 
     achievements_data = [
         {
-            'title': 'First Login',
-            'description': 'User successfully entered the platform for the first time.',
-            'image': 'achievement_images/seed/first_login.png',
-            'exp': 10,
-        },
-        {
-            'title': 'Task Starter',
-            'description': 'User completed the first training step.',
-            'image': 'achievement_images/seed/task_starter.png',
-            'exp': 25,
-        },
-        {
-            'title': 'Fast Learner',
-            'description': 'User earned several achievements in a row.',
-            'image': 'achievement_images/seed/fast_learner.png',
+            'title': 'Первая переменная',
+            'description': 'Создал свою первую переменную',
+            'image': 'achievement_images/seed/pervaya_peremennaya.png',
             'exp': 50,
+        },
+        {
+            'title': 'Король циклов',
+            'description': 'Решил 10 задач на циклы',
+            'image': 'achievement_images/seed/korol_ciklov.png',
+            'exp': 100,
+        },
+        {
+            'title': 'Мастер условий',
+            'description': 'Решил 10 задач на if/else',
+            'image': 'achievement_images/seed/master_usloviy.png',
+            'exp': 100,
+        },
+        {
+            'title': 'Победитель бота',
+            'description': 'Прошёл игру "Переменная битва"',
+            'image': 'achievement_images/seed/pobeditel_bota.png',
+            'exp': 100,
+        },
+        {
+            'title': 'Повелитель циклов',
+            'description': 'Прошёл игру "Цикло-битва"',
+            'image': 'achievement_images/seed/povelitel_ciklov.png',
+            'exp': 100,
+        },
+        {
+            'title': 'Мастер решений',
+            'description': 'Прошёл игру "Робо-битва"',
+            'image': 'achievement_images/seed/master_resheniy.png',
+            'exp': 100,
+        },
+        {
+            'title': 'Социальный кодер',
+            'description': 'Отправил 50 сообщений в чате',
+            'image': 'achievement_images/seed/socialniy_koder.png',
+            'exp': 100,
+        },
+        {
+            'title': 'Трудоголик',
+            'description': 'Провёл 10 часов в обучении',
+            'image': 'achievement_images/seed/trudogolik.png',
+            'exp': 150,
+        },
+        {
+            'title': 'Ежедневный вход',
+            'description': 'Заходить в приложение 7 дней подряд',
+            'image': 'achievement_images/seed/ezhednevniy_vhod.png',
+            'exp': 50,
+        },
+        {
+            'title': 'Отличник',
+            'description': 'Пройти тест на 100%',
+            'image': 'achievement_images/seed/otlichnik.png',
+            'exp': 100,
         },
     ]
 
@@ -105,29 +151,6 @@ def seed_initial_data(apps, schema_editor):
         )
         created_achievements[achievement.title] = achievement
 
-    granted_pairs = [
-        ('child_demo', 'First Login'),
-        ('child_demo', 'Task Starter'),
-        ('parent_demo', 'First Login'),
-    ]
-
-    for username, achievement_title in granted_pairs:
-        user = created_users[username]
-        achievement = created_achievements[achievement_title]
-        UserAchievement.objects.get_or_create(
-            user=user,
-            achievement=achievement,
-        )
-
-    for profile in Profile.objects.select_related('user'):
-        total_exp = sum(
-            item.achievement.exp
-            for item in UserAchievement.objects.filter(user=profile.user).select_related('achievement')
-        )
-        if profile.exp != total_exp:
-            profile.exp = total_exp
-            profile.save(update_fields=['exp'])
-
 
 def remove_initial_data(apps, schema_editor):
     User = apps.get_model('auth', 'User')
@@ -135,7 +158,18 @@ def remove_initial_data(apps, schema_editor):
 
     User.objects.filter(username__in=['parent_demo', 'child_demo', 'mentor_demo']).delete()
     Achievement.objects.filter(
-        title__in=['First Login', 'Task Starter', 'Fast Learner']
+        title__in=[
+            'Первая переменная',
+            'Король циклов',
+            'Мастер условий',
+            'Победитель бота',
+            'Повелитель циклов',
+            'Мастер решений',
+            'Социальный кодер',
+            'Трудоголик',
+            'Ежедневный вход',
+            'Отличник',
+        ]
     ).delete()
 
 
