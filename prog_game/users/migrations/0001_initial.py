@@ -22,7 +22,7 @@ class Migration(migrations.Migration):
                 ('isParent', models.BooleanField(default=False, help_text='Является ли пользователь родителем')),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('parentId', models.ForeignKey(blank=True, help_text='ID родителя (если пользователь - ребенок)', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='children', to='users.profile')),
+                ('parent', models.ForeignKey(blank=True, help_text='ID родителя (если пользователь - ребенок)', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='children', to='users.profile')),
                 ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='profile', to=settings.AUTH_USER_MODEL)),
             ],
             options={

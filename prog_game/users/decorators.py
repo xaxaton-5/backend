@@ -35,8 +35,8 @@ def only_parent(method):
         if request.user is None:
             return Response({'error': 'Unauthorized'}, status=403)
         
-        # Проверяем наличие профиля и флага isParent
-        if not hasattr(request.user, 'profile') or not request.user.profile.isParent:
+        # Проверяем наличие профиля и флага is_parent
+        if not hasattr(request.user, 'profile') or not request.user.profile.is_parent:
             return Response({'error': 'Forbidden. Parent rights required.'}, status=403)
         
         return method(instance, request)
@@ -52,7 +52,7 @@ def only_child(method):
             return Response({'error': 'Unauthorized'}, status=403)
         
         # Проверяем наличие профиля и наличие родителя
-        if not hasattr(request.user, 'profile') or request.user.profile.parentId is None:
+        if not hasattr(request.user, 'profile') or request.user.profile.parent is None:
             return Response({'error': 'Forbidden. Child rights required.'}, status=403)
         
         return method(instance, request)
@@ -101,10 +101,10 @@ def only_parent_or_self(method):
             return method(instance, request, *args, **kwargs)
         
         # Проверяем, является ли текущий пользователь родителем запрашиваемого
-        if hasattr(request.user, 'profile') and request.user.profile.isParent:
+        if hasattr(request.user, 'profile') and request.user.profile.is_parent:
             try:
                 target_user = User.objects.get(id=user_id)
-                if target_user.profile.parentId == request.user.profile:
+                if target_user.profile.parent == request.user.profile:
                     return method(instance, request, *args, **kwargs)
             except User.DoesNotExist:
                 pass
@@ -131,10 +131,6 @@ def check_authorization(request) -> 'User|None':
 def get_user_by_token(token: str) -> 'User|None':
     """Получение пользователя по токену"""
     try:
-        # Убираем префикс "Bearer " если есть
-        if token.startswith('Bearer '):
-            token = token[7:]
-        
         user, token = user_utils.get_user_by_token(token)
         return user
     except Exception:

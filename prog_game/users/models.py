@@ -11,8 +11,8 @@ class Profile(models.Model):
     )
     
     exp = models.IntegerField(default=0, help_text="Опыт пользователя")
-    isParent = models.BooleanField(default=False, help_text="Является ли пользователь родителем")
-    parentId = models.ForeignKey(
+    is_parent = models.BooleanField(default=False, help_text="Является ли пользователь родителем")
+    parent = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
         null=True,
@@ -34,7 +34,7 @@ class Profile(models.Model):
     def add_exp(self, amount):
         """Добавить опыт пользователю"""
         self.exp += amount
-        self.save()
+        self.save(update_fields=['exp'])
         return self.exp
 
 
@@ -43,8 +43,3 @@ def create_user_profile(sender, instance, created, **kwargs):
     """Создает профиль при создании пользователя"""
     if created:
         Profile.objects.create(user=instance)
-
-@receiver(post_save, sender=User)
-def save_user_profile(sender, instance, **kwargs):
-    """Сохраняет профиль при сохранении пользователя"""
-    instance.profile.save()

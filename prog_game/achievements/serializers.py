@@ -18,7 +18,7 @@ class AchievementSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Achievement
-        fields = ['id', 'title', 'description', 'image', 'datetime', 'exp', 
+        fields = ['id', 'title', 'description', 'image', 'exp', 
                   'users', 'users_count']
 
 

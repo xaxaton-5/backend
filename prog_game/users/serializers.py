@@ -11,22 +11,22 @@ class ProfileSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Profile
-        fields = ['exp', 'isParent', 'parentId', 'parent', 'children']
+        fields = ['exp', 'is_parent', 'parent', 'parent', 'children']
     
     def get_parent(self, obj):
         """Получить родителя"""
-        if obj.parentId:
+        if obj.parent:
             return {
-                'id': obj.parentId.user.id,
-                'username': obj.parentId.user.username,
-                'email': obj.parentId.user.email
+                'id': obj.parent.user.id,
+                'username': obj.parent.user.username,
+                'email': obj.parent.user.email
             }
         return None
     
     def get_children(self, obj):
         """Получить детей"""
-        if obj.isParent:
-            children = Profile.objects.filter(parentId=obj)
+        if obj.is_parent:
+            children = Profile.objects.filter(parent=obj)
             return [
                 {
                     'id': child.user.id,
@@ -48,9 +48,9 @@ class RegistrationSerializer(serializers.ModelSerializer):
     
     # Поля профиля
     exp = serializers.IntegerField(source='profile.exp', required=False, default=0, read_only=True)
-    isParent = serializers.BooleanField(source='profile.isParent', required=False, default=False)
-    parentId = serializers.PrimaryKeyRelatedField(
-        source='profile.parentId',
+    is_parent = serializers.BooleanField(source='profile.is_parent', required=False, default=False)
+    parent = serializers.PrimaryKeyRelatedField(
+        source='profile.parent',
         queryset=Profile.objects.all(),
         required=False,
         allow_null=True
@@ -59,7 +59,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'login', 'username', 'password', 'password_confirm', 'email', 
-                  'first_name', 'last_name', 'exp', 'isParent', 'parentId']
+                  'first_name', 'last_name', 'exp', 'is_parent', 'parent']
         extra_kwargs = {
             'first_name': {'required': False},
             'last_name': {'required': False},
@@ -84,12 +84,12 @@ class RegistrationSerializer(serializers.ModelSerializer):
         if User.objects.filter(email=email).exists():
             raise serializers.ValidationError({"email": "User with this email already exists"})
         
-        # Проверяем parentId
+        # Проверяем parent
         profile_data = data.get('profile', {})
-        parent_id = profile_data.get('parentId')
-        if parent_id:
-            if not parent_id.isParent:
-                raise serializers.ValidationError({"parentId": "Specified user is not a parent"})
+        parent = profile_data.get('parent')
+        if parent:
+            if not parent.is_parent:
+                raise serializers.ValidationError({"parent": "Specified user is not a parent"})
         
         return data
     
@@ -110,9 +110,9 @@ class RegistrationSerializer(serializers.ModelSerializer):
         # Обновляем профиль
         profile = user.profile
         for attr, value in profile_data.items():
-            if attr == 'parentId' and value:
+            if attr == 'parent' and value:
                 setattr(profile, attr, value)
-            elif attr != 'parentId':
+            elif attr != 'parent':
                 setattr(profile, attr, value)
         profile.save()
         
@@ -168,9 +168,9 @@ class UserCreateSerializer(serializers.ModelSerializer):
     login = serializers.CharField(source='username', required=True)
     password = serializers.CharField(write_only=True, required=True)
     exp = serializers.IntegerField(source='profile.exp', required=False, default=0)
-    isParent = serializers.BooleanField(source='profile.isParent', required=False, default=False)
-    parentId = serializers.PrimaryKeyRelatedField(
-        source='profile.parentId',
+    is_parent = serializers.BooleanField(source='profile.is_parent', required=False, default=False)
+    parent = serializers.PrimaryKeyRelatedField(
+        source='profile.parent',
         queryset=Profile.objects.all(),
         required=False,
         allow_null=True
@@ -179,12 +179,12 @@ class UserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'login', 'username', 'password', 'email', 'first_name', 
-                  'last_name', 'exp', 'isParent', 'parentId']
+                  'last_name', 'exp', 'is_parent', 'parent']
     
-    def validate_parentId(self, value):
+    def validate_parent(self, value):
         """Проверяем, что родитель существует и является родителем"""
         if value:
-            if not value.isParent:
+            if not value.is_parent:
                 raise serializers.ValidationError("Указанный пользователь не является родителем")
         return value
     
@@ -202,9 +202,9 @@ class UserCreateSerializer(serializers.ModelSerializer):
         # Обновляем профиль
         profile = user.profile
         for attr, value in profile_data.items():
-            if attr == 'parentId' and value:
+            if attr == 'parent' and value:
                 setattr(profile, attr, value)
-            elif attr != 'parentId':
+            elif attr != 'parent':
                 setattr(profile, attr, value)
         profile.save()
         
@@ -217,9 +217,9 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(required=False)
     last_name = serializers.CharField(required=False)
     exp = serializers.IntegerField(source='profile.exp', required=False)
-    isParent = serializers.BooleanField(source='profile.isParent', required=False)
-    parentId = serializers.PrimaryKeyRelatedField(
-        source='profile.parentId',
+    is_parent = serializers.BooleanField(source='profile.is_parent', required=False)
+    parent = serializers.PrimaryKeyRelatedField(
+        source='profile.parent',
         queryset=Profile.objects.all(),
         required=False,
         allow_null=True
@@ -227,12 +227,12 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['email', 'first_name', 'last_name', 'exp', 'isParent', 'parentId']
+        fields = ['email', 'first_name', 'last_name', 'exp', 'is_parent', 'parent']
     
-    def validate_parentId(self, value):
+    def validate_parent(self, value):
         """Проверяем, что родитель существует и является родителем"""
         if value:
-            if not value.isParent:
+            if not value.is_parent:
                 raise serializers.ValidationError("Указанный пользователь не является родителем")
         return value
     
@@ -247,9 +247,9 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         # Обновляем поля Profile
         profile = instance.profile
         for attr, value in profile_data.items():
-            if attr == 'parentId' and value:
+            if attr == 'parent' and value:
                 setattr(profile, attr, value)
-            elif attr != 'parentId':
+            elif attr != 'parent':
                 setattr(profile, attr, value)
         profile.save()
         
@@ -273,16 +273,16 @@ class UserSerializer(serializers.ModelSerializer):
     """Базовый сериализатор для пользователя"""
     login = serializers.CharField(source='username', read_only=True)
     exp = serializers.IntegerField(source='profile.exp', read_only=True)
-    isParent = serializers.BooleanField(source='profile.isParent', read_only=True)
-    parentId = serializers.SerializerMethodField()
+    is_parent = serializers.BooleanField(source='profile.is_parent', read_only=True)
+    parent = serializers.SerializerMethodField()
     
     class Meta:
         model = User
         fields = ['id', 'login', 'username', 'email', 'first_name', 'last_name', 
-                  'exp', 'isParent', 'parentId', 'date_joined']
+                  'exp', 'is_parent', 'parent', 'date_joined']
     
-    def get_parentId(self, obj):
+    def get_parent(self, obj):
         """Получить ID родителя"""
-        if obj.profile.parentId:
-            return obj.profile.parentId.user.id
+        if obj.profile.parent:
+            return obj.profile.parent.user.id
         return None
