@@ -300,7 +300,7 @@ class UserAdminUpdate(APIView):
             serializer.save()
             return Response(UserDetailSerializer(user).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
 """
 @api {POST} /api/user/result/ UserResultCreate
 @apiGroup User
@@ -308,9 +308,6 @@ class UserAdminUpdate(APIView):
 @apiHeader {String} Authorization Bearer токен
 @apiBody {String} result_type Тип результата (test/theory/practice/game)
 @apiBody {Number} exp_earned Заработанный опыт
-@apiBody {Number} [content_id] ID контента (урока/теста/игры)
-@apiBody {Number} [score] Оценка/баллы
-@apiBody {Object} [metadata] Дополнительные данные
 
 @apiSuccessExample Результат сохранен:
     HTTP/1.1 201 Created
@@ -320,9 +317,6 @@ class UserAdminUpdate(APIView):
         "username": "user1",
         "result_type": "test",
         "exp_earned": 100,
-        "content_id": 5,
-        "score": 85,
-        "metadata": {},
         "created_at": "2024-01-15T10:30:00Z"
     }
 """
@@ -364,9 +358,6 @@ class UserResultCreate(APIView):
                 "username": "user1",
                 "result_type": "test",
                 "exp_earned": 100,
-                "content_id": 5,
-                "score": 85,
-                "metadata": {},
                 "created_at": "2024-01-15T10:30:00Z"
             }
         ]
@@ -394,7 +385,7 @@ class UserResultList(APIView):
         
         return Response({
             'count': total,
-            'next': None,  # Можно добавить ссылку на следующую страницу
+            'next': None,
             'previous': None,
             'results': serializer.data
         })
@@ -415,12 +406,6 @@ class UserResultList(APIView):
         "username": "user1",
         "result_type": "test",
         "exp_earned": 100,
-        "content_id": 5,
-        "score": 85,
-        "metadata": {
-            "answers": {...},
-            "time_spent": 120
-        },
         "created_at": "2024-01-15T10:30:00Z"
     }
 """
@@ -450,8 +435,6 @@ class UserResultDetail(APIView):
         "total_practice": 10,
         "total_theory": 8,
         "total_games": 3,
-        "avg_score": 85.5,
-        "best_score": 100,
         "last_activity": "2024-01-15T10:30:00Z",
         "achievements_count": 4
     }
@@ -468,13 +451,6 @@ class UserStats(APIView):
         total_theory = results.filter(result_type='theory').count()
         total_games = results.filter(result_type='game').count()
         
-        # Средний балл
-        scores = results.filter(score__isnull=False).values_list('score', flat=True)
-        avg_score = sum(scores) / len(scores) if scores else 0
-        
-        # Лучший балл
-        best_score = max(scores) if scores else 0
-        
         # Последняя активность
         last_result = results.order_by('-created_at').first()
         last_activity = last_result.created_at if last_result else None
@@ -485,8 +461,6 @@ class UserStats(APIView):
             'total_practice': total_practice,
             'total_theory': total_theory,
             'total_games': total_games,
-            'avg_score': round(avg_score, 1),
-            'best_score': best_score,
             'last_activity': last_activity,
             'achievements_count': user.achievements.count(),
         })

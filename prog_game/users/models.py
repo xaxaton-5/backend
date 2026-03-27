@@ -63,21 +63,6 @@ class UserResult(models.Model):
         default=0,
         verbose_name='Заработанный опыт'
     )
-    content_id = models.IntegerField(
-        null=True,
-        blank=True,
-        verbose_name='ID контента (урока/теста/игры)'
-    )
-    score = models.IntegerField(
-        null=True,
-        blank=True,
-        verbose_name='Оценка/баллы'
-    )
-    metadata = models.JSONField(
-        default=dict,
-        blank=True,
-        verbose_name='Дополнительные данные'
-    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     
     class Meta:

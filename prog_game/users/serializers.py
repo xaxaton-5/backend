@@ -276,8 +276,7 @@ class UserResultSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = UserResult
-        fields = ['id', 'user_id', 'username', 'result_type', 'exp_earned', 
-                  'content_id', 'score', 'metadata', 'created_at']
+        fields = ['id', 'user_id', 'username', 'result_type', 'exp_earned', 'created_at']
         read_only_fields = ['id', 'created_at']
 
 
@@ -285,13 +284,10 @@ class UserResultCreateSerializer(serializers.ModelSerializer):
     """Сериализатор для создания результата"""
     result_type = serializers.ChoiceField(choices=UserResult.ResultType.choices, required=True)
     exp_earned = serializers.IntegerField(required=True, min_value=0)
-    content_id = serializers.IntegerField(required=False, allow_null=True)
-    score = serializers.IntegerField(required=False, allow_null=True)
-    metadata = serializers.JSONField(required=False, default=dict)
     
     class Meta:
         model = UserResult
-        fields = ['result_type', 'exp_earned', 'content_id', 'score', 'metadata']
+        fields = ['result_type', 'exp_earned']
     
     def create(self, validated_data):
         user = self.context['request'].user
