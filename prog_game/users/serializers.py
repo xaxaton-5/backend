@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from rest_framework.exceptions import ValidationError
-from users.models import Profile
+from users.models import Profile, UserResult
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -268,3 +268,37 @@ class UserAdminUpdateSerializer(serializers.ModelSerializer):
         profile.save()
         
         return instance
+
+class UserResultSerializer(serializers.ModelSerializer):
+    """Сериализатор для результатов пользователя"""
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+    
+    class Meta:
+        model = UserResult
+        fields = ['id', 'user_id', 'username', 'result_type', 'exp_earned', 
+                  'content_id', 'score', 'metadata', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class UserResultCreateSerializer(serializers.ModelSerializer):
+    """Сериализатор для создания результата"""
+    result_type = serializers.ChoiceField(choices=UserResult.ResultType.choices, required=True)
+    exp_earned = serializers.IntegerField(required=True, min_value=0)
+    content_id = serializers.IntegerField(required=False, allow_null=True)
+    score = serializers.IntegerField(required=False, allow_null=True)
+    metadata = serializers.JSONField(required=False, default=dict)
+    
+    class Meta:
+        model = UserResult
+        fields = ['result_type', 'exp_earned', 'content_id', 'score', 'metadata']
+    
+    def create(self, validated_data):
+        user = self.context['request'].user
+        result = UserResult.objects.create(user=user, **validated_data)
+        
+        # Добавляем опыт пользователю
+        if validated_data.get('exp_earned', 0) > 0:
+            user.profile.add_exp(validated_data['exp_earned'])
+        
+        return result
