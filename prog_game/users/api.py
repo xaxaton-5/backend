@@ -300,13 +300,13 @@ class UserAdminUpdate(APIView):
             serializer.save()
             return Response(UserDetailSerializer(user).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 """
 @api {POST} /api/user/result/ UserResultCreate
 @apiGroup User
 @apiDescription Сохранение результата прохождения урока/теста/практики
 @apiHeader {String} Authorization Bearer токен
 @apiBody {String} result_type Тип результата (test/theory/practice/game)
+@apiBody {String} key Ключ результата (например: "variables_lesson_1")
 @apiBody {Number} exp_earned Заработанный опыт
 
 @apiSuccessExample Результат сохранен:
@@ -316,6 +316,7 @@ class UserAdminUpdate(APIView):
         "user_id": 1,
         "username": "user1",
         "result_type": "test",
+        "key": "variables_lesson_1",
         "exp_earned": 100,
         "created_at": "2024-01-15T10:30:00Z"
     }
@@ -342,6 +343,7 @@ class UserResultCreate(APIView):
 @apiDescription Получить список результатов текущего пользователя
 @apiHeader {String} Authorization Bearer токен
 @apiParam {String} [result_type] Фильтр по типу (test/theory/practice/game)
+@apiParam {String} [key] Фильтр по ключу
 @apiParam {Number} [limit] Лимит записей
 @apiParam {Number} [offset] Смещение для пагинации
 
@@ -357,6 +359,7 @@ class UserResultCreate(APIView):
                 "user_id": 1,
                 "username": "user1",
                 "result_type": "test",
+                "key": "variables_lesson_1",
                 "exp_earned": 100,
                 "created_at": "2024-01-15T10:30:00Z"
             }
@@ -373,6 +376,11 @@ class UserResultList(APIView):
         result_type = request.query_params.get('result_type')
         if result_type:
             results = results.filter(result_type=result_type)
+        
+        # Фильтр по ключу
+        key = request.query_params.get('key')
+        if key:
+            results = results.filter(key=key)
         
         # Пагинация
         limit = int(request.query_params.get('limit', 50))
@@ -405,6 +413,7 @@ class UserResultList(APIView):
         "user_id": 1,
         "username": "user1",
         "result_type": "test",
+        "key": "variables_lesson_1",
         "exp_earned": 100,
         "created_at": "2024-01-15T10:30:00Z"
     }

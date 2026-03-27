@@ -59,6 +59,11 @@ class UserResult(models.Model):
         choices=ResultType.choices,
         verbose_name='Тип результата'
     )
+    key = models.CharField(
+        max_length=100,
+        default='',
+        verbose_name='Ключ результата'
+    )
     exp_earned = models.IntegerField(
         default=0,
         verbose_name='Заработанный опыт'
