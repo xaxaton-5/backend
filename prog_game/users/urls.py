@@ -6,7 +6,6 @@ urlpatterns = [
     path('users/list/', api.UserList.as_view()),
     path('user/detail/<int:user_id>/', api.UserDetail.as_view()),
     path('user/update/<int:user_id>/', api.UserUpdate.as_view()),
-    path('user/delete/<int:user_id>/', api.UserDelete.as_view()),
     
     # Аутентификация
     path('register/', api.Registration.as_view()),
