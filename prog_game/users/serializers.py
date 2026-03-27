@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from rest_framework.exceptions import ValidationError
-from users.models import Profile
+from users.models import Profile, UserResult
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -56,30 +56,18 @@ class ChildProfileSerializer(serializers.ModelSerializer):
 
 class RegistrationSerializer(serializers.ModelSerializer):
     """Сериализатор для регистрации нового пользователя"""
-    login = serializers.CharField(source='username', required=True, write_only=True)
+    username = serializers.CharField(required=True)
+    email = serializers.EmailField(required=True)
     password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
     password_confirm = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
-    email = serializers.EmailField(required=True)
     
     # Поля профиля
-    exp = serializers.IntegerField(source='profile.exp', required=False, default=0)
-    is_parent = serializers.BooleanField(source='profile.is_parent', required=False, default=False)
-    parent_id = serializers.PrimaryKeyRelatedField(
-        source='profile.parent',
-        queryset=Profile.objects.all(),
-        required=False,
-        allow_null=True,
-        help_text="ID родителя (если регистрируется ребенок)"
-    )
+    is_parent = serializers.BooleanField(default=False)
+    parent_id = serializers.IntegerField(required=False, allow_null=True, write_only=True)
     
     class Meta:
         model = User
-        fields = ['id', 'login', 'username', 'password', 'password_confirm', 'email', 
-                  'first_name', 'last_name', 'exp', 'is_parent', 'parent_id']
-        extra_kwargs = {
-            'first_name': {'required': False},
-            'last_name': {'required': False},
-        }
+        fields = ['id', 'username', 'email', 'password', 'password_confirm', 'is_parent', 'parent_id']
     
     def validate(self, data):
         """Проверка данных"""
@@ -90,24 +78,26 @@ class RegistrationSerializer(serializers.ModelSerializer):
         if password != password_confirm:
             raise serializers.ValidationError({"password": "Passwords do not match"})
         
-        # Проверяем, что login (username) уникален
+        # Проверяем, что username уникален
         username = data.get('username')
         if User.objects.filter(username=username).exists():
-            raise serializers.ValidationError({"login": "User with this login already exists"})
+            raise serializers.ValidationError({"username": "User with this username already exists"})
         
         # Проверяем, что email уникален
         email = data.get('email')
         if User.objects.filter(email=email).exists():
             raise serializers.ValidationError({"email": "User with this email already exists"})
         
-        # Проверяем parent
-        profile_data = data.get('profile', {})
-        parent = profile_data.get('parent')
-        if parent:
-            if not parent.is_parent:
-                raise serializers.ValidationError({"parent_id": "Specified user is not a parent"})
-            if parent.user == self.instance:
-                raise serializers.ValidationError({"parent_id": "User cannot be their own parent"})
+        # Проверяем parent_id
+        parent_id = data.get('parent_id')
+        if parent_id:
+            try:
+                parent_profile = Profile.objects.get(id=parent_id)
+                if not parent_profile.is_parent:
+                    raise serializers.ValidationError({"parent_id": "Specified user is not a parent"})
+                data['parent_profile'] = parent_profile
+            except Profile.DoesNotExist:
+                raise serializers.ValidationError({"parent_id": "Parent profile not found"})
         
         return data
     
@@ -116,20 +106,22 @@ class RegistrationSerializer(serializers.ModelSerializer):
         # Извлекаем данные
         password = validated_data.pop('password')
         validated_data.pop('password_confirm')
-        username = validated_data.pop('username')
-        profile_data = validated_data.pop('profile', {})
+        is_parent = validated_data.pop('is_parent', False)
+        parent_profile = validated_data.pop('parent_profile', None)
         
         # Создаем пользователя
-        validated_data['username'] = username
-        user = User(**validated_data)
-        user.set_password(password)
-        user.save()
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            password=password
+        )
         
         # Обновляем профиль
         profile = user.profile
-        for attr, value in profile_data.items():
-            if value is not None:
-                setattr(profile, attr, value)
+        profile.is_parent = is_parent
+        if parent_profile:
+            profile.parent = parent_profile
+        profile.exp = 0  # exp по умолчанию 0
         profile.save()
         
         return user
@@ -161,8 +153,6 @@ class AddChildSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
     password = serializers.CharField(write_only=True, required=True)
     password_confirm = serializers.CharField(write_only=True, required=True)
-    first_name = serializers.CharField(required=False, allow_blank=True)
-    last_name = serializers.CharField(required=False, allow_blank=True)
     
     def validate(self, data):
         """Проверка данных"""
@@ -180,40 +170,28 @@ class AddChildSerializer(serializers.Serializer):
 
 class LoginSerializer(serializers.Serializer):
     """Сериализатор для входа пользователя"""
-    login = serializers.CharField(required=True, help_text="Username or email")
+    email = serializers.EmailField(required=True, help_text="Email пользователя")
     password = serializers.CharField(required=True, write_only=True, style={'input_type': 'password'})
     
     def validate(self, data):
         """Проверка учетных данных"""
-        login = data.get('login')
+        email = data.get('email')
         password = data.get('password')
         
-        if not login or not password:
-            raise serializers.ValidationError("Both login and password are required")
+        if not email or not password:
+            raise serializers.ValidationError("Both email and password are required")
         
-        # Пытаемся найти пользователя по username или email
-        user = None
-        if '@' in login:
-            try:
-                user = User.objects.get(email=login)
-            except User.DoesNotExist:
-                pass
-        else:
-            try:
-                user = User.objects.get(username=login)
-            except User.DoesNotExist:
-                pass
+        # Ищем пользователя по email
+        try:
+            user = User.objects.get(email=email, is_active=True)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Invalid email or password")
         
-        if user is None:
-            raise serializers.ValidationError("Invalid login credentials")
-        
+        # Аутентифицируем пользователя
         authenticated_user = authenticate(username=user.username, password=password)
         
         if authenticated_user is None:
-            raise serializers.ValidationError("Invalid login credentials")
-        
-        if not authenticated_user.is_active:
-            raise serializers.ValidationError("User account is disabled")
+            raise serializers.ValidationError("Invalid email or password")
         
         data['user'] = authenticated_user
         return data
@@ -221,47 +199,39 @@ class LoginSerializer(serializers.Serializer):
 
 class UserDetailSerializer(serializers.ModelSerializer):
     """Детальный сериализатор для пользователя с профилем"""
-    login = serializers.CharField(source='username', read_only=True)
     profile = ProfileSerializer(read_only=True)
     achievements_count = serializers.IntegerField(source='achievements.count', read_only=True)
     total_exp = serializers.IntegerField(source='profile.exp', read_only=True)
     
     class Meta:
         model = User
-        fields = ['id', 'login', 'username', 'email', 'first_name', 'last_name',
-                  'profile', 'achievements_count', 'total_exp', 'date_joined']
+        fields = ['id', 'username', 'email', 'profile', 'achievements_count', 'total_exp', 'date_joined']
 
 
 class UserSerializer(serializers.ModelSerializer):
     """Базовый сериализатор для пользователя"""
-    login = serializers.CharField(source='username', read_only=True)
     exp = serializers.IntegerField(source='profile.exp', read_only=True)
     is_parent = serializers.BooleanField(source='profile.is_parent', read_only=True)
-    parent_id = serializers.IntegerField(source='profile.parent.user.id', read_only=True)
+    parent_id = serializers.IntegerField(source='profile.parent.id', read_only=True)
     children_count = serializers.IntegerField(source='profile.children.count', read_only=True)
     
     class Meta:
         model = User
-        fields = ['id', 'login', 'username', 'email', 'first_name', 'last_name', 
-                  'exp', 'is_parent', 'parent_id', 'children_count', 'date_joined']
+        fields = ['id', 'username', 'email', 'exp', 'is_parent', 'parent_id', 'children_count', 'date_joined']
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     """Сериализатор для обновления пользователя (обычный пользователь)"""
     email = serializers.EmailField(required=False)
-    first_name = serializers.CharField(required=False)
-    last_name = serializers.CharField(required=False)
     
     class Meta:
         model = User
-        fields = ['email', 'first_name', 'last_name']
+        fields = ['email']
 
 
 class UserAdminUpdateSerializer(serializers.ModelSerializer):
     """Сериализатор для обновления пользователя (администратор)"""
     email = serializers.EmailField(required=False)
-    first_name = serializers.CharField(required=False)
-    last_name = serializers.CharField(required=False)
     exp = serializers.IntegerField(source='profile.exp', required=False)
     is_parent = serializers.BooleanField(source='profile.is_parent', required=False)
     parent_id = serializers.PrimaryKeyRelatedField(
@@ -273,7 +243,7 @@ class UserAdminUpdateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['email', 'first_name', 'last_name', 'exp', 'is_parent', 'parent_id']
+        fields = ['email', 'exp', 'is_parent', 'parent_id']
     
     def validate_parent_id(self, value):
         """Проверяем, что родитель существует и является родителем"""
@@ -298,3 +268,33 @@ class UserAdminUpdateSerializer(serializers.ModelSerializer):
         profile.save()
         
         return instance
+
+class UserResultSerializer(serializers.ModelSerializer):
+    """Сериализатор для результатов пользователя"""
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+    
+    class Meta:
+        model = UserResult
+        fields = ['id', 'user_id', 'username', 'result_type', 'exp_earned', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class UserResultCreateSerializer(serializers.ModelSerializer):
+    """Сериализатор для создания результата"""
+    result_type = serializers.ChoiceField(choices=UserResult.ResultType.choices, required=True)
+    exp_earned = serializers.IntegerField(required=True, min_value=0)
+    
+    class Meta:
+        model = UserResult
+        fields = ['result_type', 'exp_earned']
+    
+    def create(self, validated_data):
+        user = self.context['request'].user
+        result = UserResult.objects.create(user=user, **validated_data)
+        
+        # Добавляем опыт пользователю
+        if validated_data.get('exp_earned', 0) > 0:
+            user.profile.add_exp(validated_data['exp_earned'])
+        
+        return result

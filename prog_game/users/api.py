@@ -1,6 +1,4 @@
 from django.contrib.auth.models import User
-from django.db import transaction
-
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -11,10 +9,11 @@ from users.serializers import (
     RegistrationSerializer, LoginSerializer,
     ProfileSerializer, ChildProfileSerializer,
     LinkChildSerializer, AddChildSerializer,
-    UserUpdateSerializer, UserAdminUpdateSerializer
+    UserUpdateSerializer, UserAdminUpdateSerializer,
+    UserResultSerializer, UserResultCreateSerializer
 )
 from users.utils import generate_token
-from users.models import Profile
+from users.models import Profile, UserResult
 
 
 class UserList(APIView):
@@ -62,7 +61,7 @@ class Login(APIView):
         
         user = serializer.validated_data['user']
         token = generate_token(user.id)
-        return Response({'token': token, 'user': LoginSerializer(user).data})
+        return Response({'token': token, 'user': UserSerializer(user).data})
 
 
 class CheckToken(APIView):
@@ -72,18 +71,16 @@ class CheckToken(APIView):
     def get(self, request):
         if not request.user or not request.user.is_active:
             return Response({'id': -1}, status=status.HTTP_401_UNAUTHORIZED)
-        return Response(self.serializer_class(request.user).data)
+        return Response(UserSerializer(request.user).data)
 
 
 class UserUpdate(APIView):
     @with_authorization
     def put(self, request, user_id: int):
-        # Проверяем, что обновляем свой профиль
         if request.user.id != user_id:
             return Response({'error': 'You can only update your own profile'}, 
                           status=status.HTTP_403_FORBIDDEN)
         
-        # Используем request.user вместо отдельного запроса
         serializer = UserUpdateSerializer(request.user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -91,11 +88,6 @@ class UserUpdate(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-"""
-@api {POST} /api/user/deactivate/ UserDeactivate
-@apiGroup User
-@apiDescription Деактивация пользователя (мягкое удаление)
-"""
 class UserDeactivate(APIView):
     @with_authorization
     def post(self, request):
@@ -169,16 +161,13 @@ class UserParent(APIView):
 class UserParentDetail(APIView):
     @with_authorization
     def get(self, request, user_id: int):
-        # Если запрашиваем свои данные - используем request.user
         if request.user.id == user_id:
             profile = request.user.profile
         else:
-            # Проверяем права админа
             if not request.user.is_staff:
                 return Response({'error': 'Permission denied'}, 
                               status=status.HTTP_403_FORBIDDEN)
             
-            # Получаем пользователя с профилем одним запросом
             try:
                 user = User.objects.select_related('profile').get(id=user_id)
                 profile = user.profile
@@ -207,9 +196,7 @@ class AddChild(APIView):
             child_user = User.objects.create_user(
                 username=serializer.validated_data['username'],
                 email=serializer.validated_data['email'],
-                password=serializer.validated_data['password'],
-                first_name=serializer.validated_data.get('first_name', ''),
-                last_name=serializer.validated_data.get('last_name', '')
+                password=serializer.validated_data['password']
             )
             
             child_user.profile.parent = profile
@@ -313,3 +300,167 @@ class UserAdminUpdate(APIView):
             serializer.save()
             return Response(UserDetailSerializer(user).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+"""
+@api {POST} /api/user/result/ UserResultCreate
+@apiGroup User
+@apiDescription Сохранение результата прохождения урока/теста/практики
+@apiHeader {String} Authorization Bearer токен
+@apiBody {String} result_type Тип результата (test/theory/practice/game)
+@apiBody {Number} exp_earned Заработанный опыт
+
+@apiSuccessExample Результат сохранен:
+    HTTP/1.1 201 Created
+    {
+        "id": 1,
+        "user_id": 1,
+        "username": "user1",
+        "result_type": "test",
+        "exp_earned": 100,
+        "created_at": "2024-01-15T10:30:00Z"
+    }
+"""
+class UserResultCreate(APIView):
+    @with_authorization
+    def post(self, request):
+        serializer = UserResultCreateSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        if serializer.is_valid():
+            result = serializer.save()
+            return Response(
+                UserResultSerializer(result).data,
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+"""
+@api {GET} /api/user/results/ UserResultList
+@apiGroup User
+@apiDescription Получить список результатов текущего пользователя
+@apiHeader {String} Authorization Bearer токен
+@apiParam {String} [result_type] Фильтр по типу (test/theory/practice/game)
+@apiParam {Number} [limit] Лимит записей
+@apiParam {Number} [offset] Смещение для пагинации
+
+@apiSuccessExample Список результатов:
+    HTTP/1.1 200 OK
+    {
+        "count": 10,
+        "next": null,
+        "previous": null,
+        "results": [
+            {
+                "id": 1,
+                "user_id": 1,
+                "username": "user1",
+                "result_type": "test",
+                "exp_earned": 100,
+                "created_at": "2024-01-15T10:30:00Z"
+            }
+        ]
+    }
+"""
+class UserResultList(APIView):
+    @with_authorization
+    def get(self, request):
+        user = request.user
+        results = UserResult.objects.filter(user=user)
+        
+        # Фильтр по типу
+        result_type = request.query_params.get('result_type')
+        if result_type:
+            results = results.filter(result_type=result_type)
+        
+        # Пагинация
+        limit = int(request.query_params.get('limit', 50))
+        offset = int(request.query_params.get('offset', 0))
+        
+        total = results.count()
+        results = results[offset:offset + limit]
+        
+        serializer = UserResultSerializer(results, many=True)
+        
+        return Response({
+            'count': total,
+            'next': None,
+            'previous': None,
+            'results': serializer.data
+        })
+
+
+"""
+@api {GET} /api/user/result/{result_id}/ UserResultDetail
+@apiGroup User
+@apiDescription Получить детальную информацию о результате
+@apiParam {Number} result_id ID результата
+@apiHeader {String} Authorization Bearer токен
+
+@apiSuccessExample Детальная информация:
+    HTTP/1.1 200 OK
+    {
+        "id": 1,
+        "user_id": 1,
+        "username": "user1",
+        "result_type": "test",
+        "exp_earned": 100,
+        "created_at": "2024-01-15T10:30:00Z"
+    }
+"""
+class UserResultDetail(APIView):
+    @with_authorization
+    def get(self, request, result_id: int):
+        try:
+            result = UserResult.objects.get(id=result_id, user=request.user)
+        except UserResult.DoesNotExist:
+            return Response({'error': 'Result not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        serializer = UserResultSerializer(result)
+        return Response(serializer.data)
+
+
+"""
+@api {GET} /api/user/stats/ UserStats
+@apiGroup User
+@apiDescription Получить статистику пользователя
+@apiHeader {String} Authorization Bearer токен
+
+@apiSuccessExample Статистика:
+    HTTP/1.1 200 OK
+    {
+        "total_exp": 1250,
+        "total_tests": 5,
+        "total_practice": 10,
+        "total_theory": 8,
+        "total_games": 3,
+        "last_activity": "2024-01-15T10:30:00Z",
+        "achievements_count": 4
+    }
+"""
+class UserStats(APIView):
+    @with_authorization
+    def get(self, request):
+        user = request.user
+        results = UserResult.objects.filter(user=user)
+        
+        # Статистика по типам
+        total_tests = results.filter(result_type='test').count()
+        total_practice = results.filter(result_type='practice').count()
+        total_theory = results.filter(result_type='theory').count()
+        total_games = results.filter(result_type='game').count()
+        
+        # Последняя активность
+        last_result = results.order_by('-created_at').first()
+        last_activity = last_result.created_at if last_result else None
+        
+        return Response({
+            'total_exp': user.profile.exp,
+            'total_tests': total_tests,
+            'total_practice': total_practice,
+            'total_theory': total_theory,
+            'total_games': total_games,
+            'last_activity': last_activity,
+            'achievements_count': user.achievements.count(),
+        })
