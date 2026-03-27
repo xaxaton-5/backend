@@ -1,11 +1,16 @@
 import logging
-from typing import Dict
+from typing import Any, Dict, Optional
 
 import aiohttp
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from config import settings
 from ws.manager import get_connection_manager
+
+
+class WsMessageType:
+    TEXT_MESSAGE = 'text_msg'
+    NOTIFICATION = 'notification'
 
 
 connections_manager = get_connection_manager()
@@ -37,17 +42,32 @@ async def notify_send(account_id: int, message: Dict[str, str]) -> Dict[str, str
     connection = connections_manager.active_connections.get(account_id)
     if not connection:
         return {'result': 'no-con'}
+
+    message.update(type=WsMessageType.NOTIFICATION)
     await connection.send_json(message)
     logger.info('notification sent', extra={'ctx': {'account_id': account_id, 'msg': message}})
     return {'result': 'ok'}
 
 
-async def get_account(access_token: str) -> int:
-    return 1
-    # todo: интегрируем основной сервис тут
-    # async with aiohttp.ClientSession() as session:
-    #     async with session.get(f'{settings.CORE_URL}/api/auth/', headers={'Authorization': f'Bearer {access_token}'}) as response:  # noqa: E501
-    #         if response.status == 200:
-    #             data = await response.json()
-    #             return data['id']
-    #         return None
+@router.post('/message/send')
+async def message_send(account_id: int, message: Dict[str, Any]) -> Dict[str, str]:
+    current_connection = connections_manager.active_connections.get(account_id)
+    if not current_connection:
+        return {'result': 'no-con'}
+
+    for receiver_id, connection in connections_manager.active_connections.items():
+        if receiver_id != account_id:
+            message.update(type=WsMessageType.TEXT_MESSAGE)
+            await connection.send_json(message)
+
+    logger.info('message sent', extra={'ctx': {'account_id': account_id, 'msg': message}})
+    return {'result': 'ok'}
+
+
+async def get_account(access_token: str) -> Optional[int]:
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f'{settings.CORE_URL}/api/auth/', headers={'Authorization': f'Bearer {access_token}'}) as response:  # noqa: E501
+            if response.status == 200:
+                data = await response.json()
+                return data['id']
+            return None
