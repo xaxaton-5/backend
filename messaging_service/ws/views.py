@@ -56,9 +56,8 @@ async def message_send(account_id: int, message: Dict[str, Any]) -> Dict[str, st
         return {'result': 'no-con'}
 
     for receiver_id, connection in connections_manager.active_connections.items():
-        if receiver_id != account_id:
-            message.update(type=WsMessageType.TEXT_MESSAGE)
-            await connection.send_json(message)
+        message.update(type=WsMessageType.TEXT_MESSAGE)
+        await connection.send_json(message)
 
     logger.info('message sent', extra={'ctx': {'account_id': account_id, 'msg': message}})
     return {'result': 'ok'}
