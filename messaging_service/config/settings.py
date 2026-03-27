@@ -9,7 +9,7 @@ def load_bool(env_key, default=True):
 
 HOST = os.environ.get('MESSAGING_HOST', '0.0.0.0')
 PORT = int(os.environ.get('MESSAGING_PORT', 5001))
-UVICORN_WORKERS = os.environ.get('MESSAGING_UVICORN_WORKERS', 2)
+UVICORN_WORKERS = int(os.environ.get('MESSAGING_UVICORN_WORKERS', 2))
 DEBUG = load_bool('MESSAGING_DEBUG')
 
 

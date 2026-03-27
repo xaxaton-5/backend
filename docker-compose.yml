@@ -1,0 +1,39 @@
+services:
+  web:
+    build:
+      context: ./prog_game
+      dockerfile: Dockerfile
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    environment:
+      SECRET_KEY: no-so-secret
+      DEBUG: "true"
+      ALLOWED_HOSTS: "*"
+      MESSAGING_SERVICE_URL: http://messaging:5001
+      EMAIL_SENDER: ""
+      EMAIL_PASSWORD: ""
+    ports:
+      - "8000:8000"
+    volumes:
+      - django_sqlite_data:/app/data
+    depends_on:
+      - messaging
+
+  messaging:
+    build:
+      context: ./messaging_service
+      dockerfile: Dockerfile
+    command: python run.py
+    environment:
+      MESSAGING_HOST: 0.0.0.0
+      MESSAGING_PORT: "5001"
+      MESSAGING_DEBUG: "true"
+      MESSAGING_UVICORN_WORKERS: "1"
+      LOG_LEVEL: INFO
+    ports:
+      - "5001:5001"
+    volumes:
+      - messaging_logs:/app/log
+
+volumes:
+  django_sqlite_data:
+  messaging_logs:
