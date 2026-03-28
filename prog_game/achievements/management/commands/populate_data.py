@@ -18,14 +18,14 @@ class Command(BaseCommand):
         parser.add_argument(
             '--users',
             type=int,
-            default=10,
-            help='Number of users to create (default: 10)'
+            default=12,
+            help='Number of users to create (default: 12)'
         )
         parser.add_argument(
             '--parents',
             type=int,
-            default=3,
-            help='Number of parent users to create (default: 3)'
+            default=4,
+            help='Number of parent users to create (default: 4)'
         )
 
     def handle(self, *args, **options):
@@ -237,28 +237,30 @@ class Command(BaseCommand):
         self.stdout.write(f'\n👥 Creating {total_users} users ({parent_count} parents)...')
 
         parent_profiles = [
-            ('ivan_petrov', 'ivan.petrov@example.com', 'Ivan', 'Petrov'),
-            ('maria_sokolova', 'maria.sokolova@example.com', 'Maria', 'Sokolova'),
-            ('sergey_ivanov', 'sergey.ivanov@example.com', 'Sergey', 'Ivanov'),
-            ('elena_smirnova', 'elena.smirnova@example.com', 'Elena', 'Smirnova'),
-            ('dmitry_kozlov', 'dmitry.kozlov@example.com', 'Dmitry', 'Kozlov'),
-            ('anna_fedorova', 'anna.fedorova@example.com', 'Anna', 'Fedorova'),
+            ('МаминКодер', 'ivan.petrov@example.com', 'Иван', 'Петров'),
+            ('СуперКодер', 'maria.sokolova@example.com', 'Мария', 'Соколова'),
+            ('Сергей Иванов', 'sergey.ivanov@example.com', 'Сергей', 'Иванов'),
+            ('Елена Смирнова', 'elena.smirnova@example.com', 'Елена', 'Смирнова'),
+            ('DebugБатя', 'dmitry.kozlov@example.com', 'Дмитрий', 'Козлов'),
+            ('МамаНаПитоне', 'anna.fedorova@example.com', 'Анна', 'Федорова'),
         ]
         child_profiles = [
-            ('alexey_petrov', 'alexey.petrov@example.com', 'Alexey', 'Petrov'),
-            ('olga_sokolova', 'olga.sokolova@example.com', 'Olga', 'Sokolova'),
-            ('nikita_ivanov', 'nikita.ivanov@example.com', 'Nikita', 'Ivanov'),
-            ('alina_smirnova', 'alina.smirnova@example.com', 'Alina', 'Smirnova'),
-            ('egor_kozlov', 'egor.kozlov@example.com', 'Egor', 'Kozlov'),
-            ('polina_fedorova', 'polina.fedorova@example.com', 'Polina', 'Fedorova'),
-            ('maksim_novikov', 'maksim.novikov@example.com', 'Maksim', 'Novikov'),
-            ('sofia_orlova', 'sofia.orlova@example.com', 'Sofia', 'Orlova'),
+            ('Программист2000', 'alexey.petrov@example.com', 'Алексей', 'Петров'),
+            ('КодикОгонь', 'olga.sokolova@example.com', 'Ольга', 'Соколова'),
+            ('Никита Иванов', 'nikita.ivanov@example.com', 'Никита', 'Иванов'),
+            ('Алина Смирнова', 'alina.smirnova@example.com', 'Алина', 'Смирнова'),
+            ('ПиксельныйГений', 'egor.kozlov@example.com', 'Егор', 'Козлов'),
+            ('Полина Федорова', 'polina.fedorova@example.com', 'Полина', 'Федорова'),
+            ('МегаАлгоритм', 'maksim.novikov@example.com', 'Максим', 'Новиков'),
+            ('София Орлова', 'sofia.orlova@example.com', 'София', 'Орлова'),
+            ('Тимур Кузнецов', 'timur.kuznetsov@example.com', 'Тимур', 'Кузнецов'),
+            ('Лиза Романова', 'liza.romanova@example.com', 'Лиза', 'Романова'),
         ]
         adult_profiles = [
-            ('andrey_volkov', 'andrey.volkov@example.com', 'Andrey', 'Volkov'),
-            ('svetlana_morozova', 'svetlana.morozova@example.com', 'Svetlana', 'Morozova'),
-            ('kirill_zaitsev', 'kirill.zaitsev@example.com', 'Kirill', 'Zaitsev'),
-            ('veronika_pavlova', 'veronika.pavlova@example.com', 'Veronika', 'Pavlova'),
+            ('КодМастер', 'andrey.volkov@example.com', 'Андрей', 'Волков'),
+            ('ТихийКомпилятор', 'svetlana.morozova@example.com', 'Светлана', 'Морозова'),
+            ('ДядяДебаг', 'kirill.zaitsev@example.com', 'Кирилл', 'Зайцев'),
+            ('ФункцияУспеха', 'veronika.pavlova@example.com', 'Вероника', 'Павлова'),
         ]
 
         # Создаем родителей
@@ -343,6 +345,12 @@ class Command(BaseCommand):
             profile.save()
         else:
             # Обновляем существующего пользователя
+            user.email = email
+            user.first_name = first_name
+            user.last_name = last_name
+            user.is_active = True
+            user.save(update_fields=['email', 'first_name', 'last_name', 'is_active'])
+
             profile = user.profile
             if is_parent:
                 profile.is_parent = is_parent
@@ -396,39 +404,39 @@ class Command(BaseCommand):
 
         # Создаем семью с двумя родителями и двумя детьми
         parent1 = self.create_single_user(
-            username='ivan_parent',
+            username='МаминКодер',
             email='ivan@family.com',
-            first_name='Ivan',
-            last_name='Petrov',
+            first_name='Иван',
+            last_name='Петров',
             is_parent=True,
             exp=random.randint(500, 5000)
         )
 
         parent2 = self.create_single_user(
-            username='maria_parent',
+            username='СуперКодер',
             email='maria@family.com',
-            first_name='Maria',
-            last_name='Petrova',
+            first_name='Мария',
+            last_name='Петрова',
             is_parent=True,
             exp=random.randint(500, 5000)
         )
 
         # Дети
         child1 = self.create_single_user(
-            username='aleksandr_petrov',
+            username='Программист2000',
             email='aleksandr.petrov@family.com',
-            first_name='Aleksandr',
-            last_name='Petrov',
+            first_name='Александр',
+            last_name='Петров',
             is_parent=False,
             parent=parent1.profile,
             exp=random.randint(500, 5000)
         )
 
         child2 = self.create_single_user(
-            username='olga_petrova',
+            username='КодикОгонь',
             email='olga.petrova@family.com',
-            first_name='Olga',
-            last_name='Petrova',
+            first_name='Ольга',
+            last_name='Петрова',
             is_parent=False,
             parent=parent1.profile,
             exp=random.randint(500, 5000)
