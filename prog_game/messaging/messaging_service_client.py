@@ -18,7 +18,7 @@ class MessagingServiceClient:
     def send_message(cls, sender: User, message_text: str) -> None:
         url = f'{cls.base_url}/message/send'
         params = {'account_id': sender.pk}
-        data = {'text': message_text, 'sender_name': sender.username, 'sender_id': sender.pk}
+        data = {'data': {'text': message_text, 'sender_name': sender.username, 'sender_id': sender.pk}}
         try:
             response = requests.post(url, params=params, json=data, timeout=5)
             response.raise_for_status()
