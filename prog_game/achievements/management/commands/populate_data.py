@@ -31,16 +31,16 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if options['clear']:
             self.clear_data()
-        
+
         # Создаем достижения из вашего списка
         achievements = self.create_achievements()
-        
+
         # Создаем пользователей
         users = self.create_users(options['users'], options['parents'])
-        
+
         # Назначаем достижения пользователям
         self.assign_achievements_to_users(users, achievements)
-        
+
         self.stdout.write(
             self.style.SUCCESS(
                 f'\n✅ Successfully created {len(achievements)} achievements '
@@ -59,7 +59,7 @@ class Command(BaseCommand):
     def create_achievements(self):
         """Создание достижений из фронтенд-списка"""
         self.stdout.write('\n📚 Creating achievements...')
-        
+
         # Данные достижений с эмодзи
         achievements_data = [
             {
@@ -204,7 +204,7 @@ class Command(BaseCommand):
                 'condition_value': 10000
             }
         ]
-        
+
         achievements = []
         for data in achievements_data:
             achievement, created = Achievement.objects.get_or_create(
@@ -215,21 +215,21 @@ class Command(BaseCommand):
                     'exp': data['exp'],
                 }
             )
-            
+
             # Если достижение уже существует, обновляем поля
             if not created:
                 achievement.description = data['description']
                 achievement.emoji = data['emoji']
                 achievement.exp = data['exp']
                 achievement.save()
-            
+
             achievements.append(achievement)
-            
+
             if created:
                 self.stdout.write(f'  ✓ Created: {achievement.emoji} {achievement.title} (+{data["exp"]} XP)')
             else:
                 self.stdout.write(f'  ○ Updated: {achievement.emoji} {achievement.title}')
-        
+
         return achievements
 
     def create_users(self, total_users, parent_count):
@@ -260,7 +260,7 @@ class Command(BaseCommand):
             ('kirill_zaitsev', 'kirill.zaitsev@example.com', 'Kirill', 'Zaitsev'),
             ('veronika_pavlova', 'veronika.pavlova@example.com', 'Veronika', 'Pavlova'),
         ]
-        
+
         # Создаем родителей
         parents = []
         for i in range(parent_count):
@@ -271,20 +271,20 @@ class Command(BaseCommand):
                 first_name=first_name,
                 last_name=last_name,
                 is_parent=True,
-                exp=random.randint(200, 1000)
+                exp=random.randint(500, 5000)
             )
             parents.append(user)
             self.stdout.write(f'  ✓ Created parent: {user.username} (XP: {user.profile.exp})')
-        
+
         # Создаем детей
         children_count = total_users - parent_count
         children = []
-        
+
         for i in range(children_count):
             # Выбираем случайного родителя
             parent = random.choice(parents) if parents else None
             username, email, first_name, last_name = child_profiles[i % len(child_profiles)]
-            
+
             user = self.create_single_user(
                 username=username,
                 email=email,
@@ -292,14 +292,14 @@ class Command(BaseCommand):
                 last_name=last_name,
                 is_parent=False,
                 parent=parent.profile if parent else None,
-                exp=random.randint(0, 500)
+                exp=random.randint(500, 5000)
             )
             children.append(user)
             self.stdout.write(
                 f'  ✓ Created child: {user.username} (XP: {user.profile.exp}, '
                 f'Parent: {parent.username if parent else "None"})'
             )
-        
+
         # Добавляем взрослых без детей
         adults_count = max(0, total_users - parent_count - children_count)
         for i in range(adults_count):
@@ -311,11 +311,11 @@ class Command(BaseCommand):
                 last_name=last_name,
                 is_parent=False,
                 parent=None,
-                exp=random.randint(100, 800)
+                exp=random.randint(500, 5000)
             )
             children.append(user)
             self.stdout.write(f'  ✓ Created adult: {user.username} (XP: {user.profile.exp})')
-        
+
         return parents + children
 
     def create_single_user(self, username, email, first_name, last_name, is_parent=False, parent=None, exp=0):
@@ -329,11 +329,11 @@ class Command(BaseCommand):
                 'is_active': True
             }
         )
-        
+
         if created:
             user.set_password('password123')
             user.save()
-            
+
             # Обновляем профиль
             profile = user.profile
             profile.is_parent = is_parent
@@ -350,50 +350,50 @@ class Command(BaseCommand):
                 profile.parent = parent
             profile.exp = exp
             profile.save()
-        
+
         return user
 
     def assign_achievements_to_users(self, users, achievements):
         """Назначение достижений пользователям"""
         self.stdout.write(f'\n🏆 Assigning achievements to users...')
-        
+
         assigned_count = 0
-        
+
         for user in users:
             # Определяем, какие достижения заслужил пользователь на основе его опыта
             earned_achievements = []
-            
+
             for achievement in achievements:
                 # Проверяем, подходит ли достижение по опыту
                 if achievement.exp <= user.profile.exp:
                     earned_achievements.append(achievement)
-            
+
             # Назначаем от 2 до 4 достижений (но не больше, чем заработано)
             num_to_assign = min(
                 random.randint(2, 4),
                 len(earned_achievements)
             )
-            
+
             if num_to_assign > 0 and earned_achievements:
                 selected_achievements = random.sample(earned_achievements, num_to_assign)
-                
+
                 for achievement in selected_achievements:
                     user_achievement, created = UserAchievement.objects.get_or_create(
                         user=user,
                         achievement=achievement,
                         defaults={'datetime': timezone.now()}
                     )
-                    
+
                     if created:
                         assigned_count += 1
                         self.stdout.write(f'  ✓ {user.username} earned: {achievement.emoji} {achievement.title}')
-        
+
         self.stdout.write(self.style.SUCCESS(f'\n✨ Assigned {assigned_count} achievements in total'))
-    
+
     def create_test_families(self):
         """Создание тестовых семей (можно вызвать отдельно)"""
         self.stdout.write('\n👨‍👩‍👧‍👦 Creating test families...')
-        
+
         # Создаем семью с двумя родителями и двумя детьми
         parent1 = self.create_single_user(
             username='ivan_parent',
@@ -401,18 +401,18 @@ class Command(BaseCommand):
             first_name='Ivan',
             last_name='Petrov',
             is_parent=True,
-            exp=1500
+            exp=random.randint(500, 5000)
         )
-        
+
         parent2 = self.create_single_user(
             username='maria_parent',
             email='maria@family.com',
             first_name='Maria',
             last_name='Petrova',
             is_parent=True,
-            exp=1200
+            exp=random.randint(500, 5000)
         )
-        
+
         # Дети
         child1 = self.create_single_user(
             username='aleksandr_petrov',
@@ -421,9 +421,9 @@ class Command(BaseCommand):
             last_name='Petrov',
             is_parent=False,
             parent=parent1.profile,
-            exp=450
+            exp=random.randint(500, 5000)
         )
-        
+
         child2 = self.create_single_user(
             username='olga_petrova',
             email='olga.petrova@family.com',
@@ -431,12 +431,12 @@ class Command(BaseCommand):
             last_name='Petrova',
             is_parent=False,
             parent=parent1.profile,
-            exp=320
+            exp=random.randint(500, 5000)
         )
-        
+
         self.stdout.write(self.style.SUCCESS(
             f'✓ Created family: {parent1.username}, {parent2.username} '
             f'with children {child1.username}, {child2.username}'
         ))
-        
+
         return [parent1, parent2, child1, child2]
