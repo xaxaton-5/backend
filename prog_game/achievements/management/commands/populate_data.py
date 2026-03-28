@@ -235,15 +235,41 @@ class Command(BaseCommand):
     def create_users(self, total_users, parent_count):
         """Создание пользователей"""
         self.stdout.write(f'\n👥 Creating {total_users} users ({parent_count} parents)...')
+
+        parent_profiles = [
+            ('ivan_petrov', 'ivan.petrov@example.com', 'Ivan', 'Petrov'),
+            ('maria_sokolova', 'maria.sokolova@example.com', 'Maria', 'Sokolova'),
+            ('sergey_ivanov', 'sergey.ivanov@example.com', 'Sergey', 'Ivanov'),
+            ('elena_smirnova', 'elena.smirnova@example.com', 'Elena', 'Smirnova'),
+            ('dmitry_kozlov', 'dmitry.kozlov@example.com', 'Dmitry', 'Kozlov'),
+            ('anna_fedorova', 'anna.fedorova@example.com', 'Anna', 'Fedorova'),
+        ]
+        child_profiles = [
+            ('alexey_petrov', 'alexey.petrov@example.com', 'Alexey', 'Petrov'),
+            ('olga_sokolova', 'olga.sokolova@example.com', 'Olga', 'Sokolova'),
+            ('nikita_ivanov', 'nikita.ivanov@example.com', 'Nikita', 'Ivanov'),
+            ('alina_smirnova', 'alina.smirnova@example.com', 'Alina', 'Smirnova'),
+            ('egor_kozlov', 'egor.kozlov@example.com', 'Egor', 'Kozlov'),
+            ('polina_fedorova', 'polina.fedorova@example.com', 'Polina', 'Fedorova'),
+            ('maksim_novikov', 'maksim.novikov@example.com', 'Maksim', 'Novikov'),
+            ('sofia_orlova', 'sofia.orlova@example.com', 'Sofia', 'Orlova'),
+        ]
+        adult_profiles = [
+            ('andrey_volkov', 'andrey.volkov@example.com', 'Andrey', 'Volkov'),
+            ('svetlana_morozova', 'svetlana.morozova@example.com', 'Svetlana', 'Morozova'),
+            ('kirill_zaitsev', 'kirill.zaitsev@example.com', 'Kirill', 'Zaitsev'),
+            ('veronika_pavlova', 'veronika.pavlova@example.com', 'Veronika', 'Pavlova'),
+        ]
         
         # Создаем родителей
         parents = []
         for i in range(parent_count):
+            username, email, first_name, last_name = parent_profiles[i % len(parent_profiles)]
             user = self.create_single_user(
-                username=f'parent_{i+1}',
-                email=f'parent{i+1}@example.com',
-                first_name=f'Parent{i+1}',
-                last_name='Family',
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
                 is_parent=True,
                 exp=random.randint(200, 1000)
             )
@@ -257,12 +283,13 @@ class Command(BaseCommand):
         for i in range(children_count):
             # Выбираем случайного родителя
             parent = random.choice(parents) if parents else None
+            username, email, first_name, last_name = child_profiles[i % len(child_profiles)]
             
             user = self.create_single_user(
-                username=f'child_{i+1}',
-                email=f'child{i+1}@example.com',
-                first_name=f'Child{i+1}',
-                last_name='Junior',
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
                 is_parent=False,
                 parent=parent.profile if parent else None,
                 exp=random.randint(0, 500)
@@ -276,11 +303,12 @@ class Command(BaseCommand):
         # Добавляем взрослых без детей
         adults_count = max(0, total_users - parent_count - children_count)
         for i in range(adults_count):
+            username, email, first_name, last_name = adult_profiles[i % len(adult_profiles)]
             user = self.create_single_user(
-                username=f'adult_{i+1}',
-                email=f'adult{i+1}@example.com',
-                first_name=f'Adult{i+1}',
-                last_name='Smith',
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
                 is_parent=False,
                 parent=None,
                 exp=random.randint(100, 800)
@@ -370,8 +398,8 @@ class Command(BaseCommand):
         parent1 = self.create_single_user(
             username='ivan_parent',
             email='ivan@family.com',
-            first_name='Иван',
-            last_name='Петров',
+            first_name='Ivan',
+            last_name='Petrov',
             is_parent=True,
             exp=1500
         )
@@ -379,28 +407,28 @@ class Command(BaseCommand):
         parent2 = self.create_single_user(
             username='maria_parent',
             email='maria@family.com',
-            first_name='Мария',
-            last_name='Петрова',
+            first_name='Maria',
+            last_name='Petrova',
             is_parent=True,
             exp=1200
         )
         
         # Дети
         child1 = self.create_single_user(
-            username='alex_child',
-            email='alex@family.com',
-            first_name='Александр',
-            last_name='Петров',
+            username='aleksandr_petrov',
+            email='aleksandr.petrov@family.com',
+            first_name='Aleksandr',
+            last_name='Petrov',
             is_parent=False,
             parent=parent1.profile,
             exp=450
         )
         
         child2 = self.create_single_user(
-            username='olga_child',
-            email='olga@family.com',
-            first_name='Ольга',
-            last_name='Петрова',
+            username='olga_petrova',
+            email='olga.petrova@family.com',
+            first_name='Olga',
+            last_name='Petrova',
             is_parent=False,
             parent=parent1.profile,
             exp=320
