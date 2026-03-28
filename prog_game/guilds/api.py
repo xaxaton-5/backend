@@ -1,10 +1,15 @@
-from django.db.models import Count
+from django.db.models import Count, Sum
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from guilds.models import Guild, GuildMembership
-from guilds.serializers import GuildJoinSerializer, GuildMembershipSerializer, GuildSerializer
+from guilds.serializers import (
+    GuildDetailSerializer,
+    GuildJoinSerializer,
+    GuildMembershipSerializer,
+    GuildSerializer,
+)
 from users.decorators import with_authorization
 
 
@@ -45,5 +50,27 @@ class GuildJoin(APIView):
         )
 
 
+class GuildDetail(APIView):
+    @with_authorization
+    def get(self, request, slug: str):
+        membership = GuildMembership.objects.filter(user=request.user).select_related('guild').first()
+
+        try:
+            guild = (
+                Guild.objects.annotate(
+                    member_count=Count('memberships'),
+                    total_exp=Sum('users__profile__exp'),
+                )
+                .prefetch_related('users__profile')
+                .get(slug=slug)
+            )
+        except Guild.DoesNotExist:
+            return Response({'error': 'Guild not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = GuildDetailSerializer(guild, context={'membership': membership})
+        return Response(serializer.data)
+
+
 guild_list = GuildList.as_view()
 guild_join = GuildJoin.as_view()
+guild_detail = GuildDetail.as_view()

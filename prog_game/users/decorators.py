@@ -8,29 +8,29 @@ from users import utils as user_utils
 def with_authorization(method):
     """Декоратор для проверки авторизации"""
     @wraps(method)
-    def inner(instance, request):
+    def inner(instance, request, *args, **kwargs):
         request = process_request(request)
         if request.user is None:
             return Response({'error': 'Unauthorized'}, status=403)
-        return method(instance, request)
+        return method(instance, request, *args, **kwargs)
     return inner
 
 
 def only_admin(method):
     """Декоратор для проверки прав администратора"""
     @wraps(method)
-    def inner(instance, request):
+    def inner(instance, request, *args, **kwargs):
         request = process_request(request)
         if request.user is None or not request.user.is_staff:
             return Response({'error': 'Forbidden. Admin rights required.'}, status=403)
-        return method(instance, request)
+        return method(instance, request, *args, **kwargs)
     return inner
 
 
 def only_parent(method):
     """Декоратор для проверки, что пользователь является родителем"""
     @wraps(method)
-    def inner(instance, request):
+    def inner(instance, request, *args, **kwargs):
         request = process_request(request)
         if request.user is None:
             return Response({'error': 'Unauthorized'}, status=403)
@@ -39,14 +39,14 @@ def only_parent(method):
         if not hasattr(request.user, 'profile') or not request.user.profile.is_parent:
             return Response({'error': 'Forbidden. Parent rights required.'}, status=403)
         
-        return method(instance, request)
+        return method(instance, request, *args, **kwargs)
     return inner
 
 
 def only_child(method):
     """Декоратор для проверки, что пользователь является ребенком"""
     @wraps(method)
-    def inner(instance, request):
+    def inner(instance, request, *args, **kwargs):
         request = process_request(request)
         if request.user is None:
             return Response({'error': 'Unauthorized'}, status=403)
@@ -55,7 +55,7 @@ def only_child(method):
         if not hasattr(request.user, 'profile') or request.user.profile.parent is None:
             return Response({'error': 'Forbidden. Child rights required.'}, status=403)
         
-        return method(instance, request)
+        return method(instance, request, *args, **kwargs)
     return inner
 
 

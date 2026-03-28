@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from guilds.models import Guild, GuildMembership
+from users.serializers import UserSerializer
 
 
 class GuildSerializer(serializers.ModelSerializer):
@@ -25,6 +26,38 @@ class GuildSerializer(serializers.ModelSerializer):
     def get_is_joined(self, obj):
         membership = self.context.get('membership')
         return bool(membership and membership.guild_id == obj.id)
+
+
+class GuildDetailSerializer(serializers.ModelSerializer):
+    member_count = serializers.IntegerField(read_only=True)
+    total_exp = serializers.IntegerField(read_only=True)
+    is_joined = serializers.SerializerMethodField()
+    members = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Guild
+        fields = [
+            'id',
+            'name',
+            'slug',
+            'emoji',
+            'tagline',
+            'description',
+            'focus',
+            'topics',
+            'member_count',
+            'total_exp',
+            'is_joined',
+            'members',
+        ]
+
+    def get_is_joined(self, obj):
+        membership = self.context.get('membership')
+        return bool(membership and membership.guild_id == obj.id)
+
+    def get_members(self, obj):
+        users = obj.users.all().order_by('-profile__exp', 'username')
+        return UserSerializer(users, many=True).data
 
 
 class GuildMembershipSerializer(serializers.ModelSerializer):

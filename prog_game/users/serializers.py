@@ -214,10 +214,21 @@ class UserSerializer(serializers.ModelSerializer):
     is_parent = serializers.BooleanField(source='profile.is_parent', read_only=True)
     parent_id = serializers.IntegerField(source='profile.parent.id', read_only=True)
     children_count = serializers.IntegerField(source='profile.children.count', read_only=True)
+    guild_name = serializers.CharField(source='guild_membership.guild.name', read_only=True)
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'exp', 'is_parent', 'parent_id', 'children_count', 'date_joined']
+        fields = [
+            'id',
+            'username',
+            'email',
+            'exp',
+            'is_parent',
+            'parent_id',
+            'children_count',
+            'guild_name',
+            'date_joined',
+        ]
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
