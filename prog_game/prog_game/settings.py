@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     'users.apps.UsersConfig',
     'achievements.apps.AchievementsConfig',
     'messaging.apps.MessagingConfig',
+    'guilds.apps.GuildsConfig',
 ]
 
 MIDDLEWARE = [

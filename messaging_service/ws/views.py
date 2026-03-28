@@ -100,19 +100,31 @@ async def _load_connected_users_payload(
 
     async def fetch_one(user_id: int) -> Optional[Dict[str, Any]]:
         url = f'{base}/api/user/detail/{user_id}/'
-        async with session.get(url, headers=auth_headers) as resp:
-            if resp.status != 200:
-                if strict:
-                    raise HTTPException(
-                        status_code=status.HTTP_502_BAD_GATEWAY,
-                        detail=f'failed to fetch user detail for id={user_id}',
+        try:
+            async with session.get(url, headers=auth_headers) as resp:
+                if resp.status != 200:
+                    if strict:
+                        raise HTTPException(
+                            status_code=status.HTTP_502_BAD_GATEWAY,
+                            detail=f'failed to fetch user detail for id={user_id}',
+                        )
+                    logger.warning(
+                        'user detail fetch failed for broadcast',
+                        extra={'ctx': {'user_id': user_id, 'status': resp.status}},
                     )
-                logger.warning(
-                    'user detail fetch failed for broadcast',
-                    extra={'ctx': {'user_id': user_id, 'status': resp.status}},
+                    return None
+                detail = await resp.json()
+        except aiohttp.ClientError:
+            if strict:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f'failed to reach core service for user id={user_id}',
                 )
-                return None
-            detail = await resp.json()
+            logger.warning(
+                'core service unavailable while fetching connected users',
+                extra={'ctx': {'user_id': user_id, 'core_url': base}},
+            )
+            return None
         return _user_detail_to_item(detail)
 
     items = await asyncio.gather(*[fetch_one(uid) for uid in user_ids])
@@ -166,9 +178,19 @@ async def users_list(access_token: str = Body(..., embed=True)) -> List[Dict[str
 
 
 async def get_account(access_token: str) -> Optional[int]:
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f'{settings.CORE_URL}/api/auth/', headers={'Authorization': f'Bearer {access_token}'}) as response:  # noqa: E501
-            if response.status == 200:
-                data = await response.json()
-                return data['id']
-            return None
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f'{settings.CORE_URL}/api/auth/',
+                headers={'Authorization': f'Bearer {access_token}'},
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data['id']
+                return None
+    except aiohttp.ClientError:
+        logger.warning(
+            'core service unavailable during websocket auth',
+            extra={'ctx': {'core_url': settings.CORE_URL}},
+        )
+        return None

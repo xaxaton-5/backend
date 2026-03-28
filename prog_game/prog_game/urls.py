@@ -8,6 +8,7 @@ urlpatterns = [
     path('api/', include('users.urls')),
     path('api/', include('achievements.urls')),
     path('api/', include('messaging.urls')),
+    path('api/', include('guilds.urls')),
 ]
 
 urlpatterns += staticfiles_urlpatterns()
